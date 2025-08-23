@@ -1,11 +1,7 @@
 "use client";
-import { SignIn } from '@clerk/nextjs'
-import React from 'react'
 
-const page = () => {
-  return (
-    <SignIn/>
-  )
+import { SignIn } from "@clerk/nextjs";
+
+export default function Page() {
+  return <SignIn fallbackRedirectUrl="/dashboard" />; 
 }
-
-export default page
