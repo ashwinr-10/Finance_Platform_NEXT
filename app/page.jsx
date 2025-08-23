@@ -88,7 +88,7 @@ const LandingPage = () => {
                       width={40}
                       height={40}
                       className="rounded-full"
-                      
+                      unoptimized
                     />
                     <div className="ml-4">
                       <div className="font-semibold">{testimonial.name}</div>
