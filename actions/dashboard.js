@@ -5,6 +5,7 @@ import { db } from "@/lib/prisma";
 import { request } from "@arcjet/next";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { checkUser } from "@/lib/checkUser";
 
 const serializeTransaction = (obj) => {
   const serialized = { ...obj };
@@ -18,16 +19,27 @@ const serializeTransaction = (obj) => {
 };
 
 export async function getUserAccounts() {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
-
-  const user = await db.user.findUnique({
-    where: { clerkUserId: userId },
-  });
-
-  if (!user) {
-    throw new Error("User not found");
+  // Ensure user is created in the database first with retry logic
+  let user = null;
+  let retries = 0;
+  const maxRetries = 3;
+  
+  while (!user && retries < maxRetries) {
+    try {
+      user = await checkUser();
+      if (user) break;
+    } catch (error) {
+      retries++;
+      if (retries < maxRetries) {
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 100 * retries));
+      } else {
+        throw error;
+      }
+    }
   }
+  
+  if (!user) throw new Error("Unauthorized");
 
   try {
     const accounts = await db.account.findMany({
@@ -53,15 +65,16 @@ export async function getUserAccounts() {
 
 export async function createAccount(data) {
   try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+    // Ensure user is created in the database first
+    const user = await checkUser();
+    if (!user) throw new Error("Unauthorized");
 
     // Get request data for ArcJet
     const req = await request();
 
     // Check rate limit
     const decision = await aj.protect(req, {
-      userId,
+      userId: user.clerkUserId,
       requested: 1, // Specify how many tokens to consume
     });
 
@@ -80,14 +93,6 @@ export async function createAccount(data) {
       }
 
       throw new Error("Request blocked");
-    }
-
-    const user = await db.user.findUnique({
-      where: { clerkUserId: userId },
-    });
-
-    if (!user) {
-      throw new Error("User not found");
     }
 
     // Convert balance to float before saving
@@ -135,16 +140,27 @@ export async function createAccount(data) {
 }
 
 export async function getDashboardData() {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
-
-  const user = await db.user.findUnique({
-    where: { clerkUserId: userId },
-  });
-
-  if (!user) {
-    throw new Error("User not found");
+  // Ensure user is created in the database first with retry logic
+  let user = null;
+  let retries = 0;
+  const maxRetries = 3;
+  
+  while (!user && retries < maxRetries) {
+    try {
+      user = await checkUser();
+      if (user) break;
+    } catch (error) {
+      retries++;
+      if (retries < maxRetries) {
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 100 * retries));
+      } else {
+        throw error;
+      }
+    }
   }
+  
+  if (!user) throw new Error("Unauthorized");
 
   // Get all user transactions
   const transactions = await db.transaction.findMany({
